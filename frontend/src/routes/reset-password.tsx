@@ -1,20 +1,15 @@
-import {
-  Button,
-  Container,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
-  Heading,
-  Input,
-  Text,
-} from "@chakra-ui/react"
+import { Container, Heading, Text } from "@chakra-ui/react"
+import { useMutation } from "@tanstack/react-query"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { type SubmitHandler, useForm } from "react-hook-form"
-import { useMutation } from "react-query"
+import { FiLock } from "react-icons/fi"
 
-import { type ApiError, LoginService, type NewPassword } from "../client"
-import { isLoggedIn } from "../hooks/useAuth"
-import useCustomToast from "../hooks/useCustomToast"
+import { type ApiError, LoginService, type NewPassword } from "@/client"
+import { Button } from "@/components/ui/button"
+import { PasswordInput } from "@/components/ui/password-input"
+import { isLoggedIn } from "@/hooks/useAuth"
+import useCustomToast from "@/hooks/useCustomToast"
+import { confirmPasswordRules, handleError, passwordRules } from "@/utils"
 
 interface NewPasswordForm extends NewPassword {
   confirm_password: string
@@ -45,7 +40,7 @@ function ResetPassword() {
       new_password: "",
     },
   })
-  const showToast = useCustomToast()
+  const { showSuccessToast } = useCustomToast()
   const navigate = useNavigate()
 
   const resetPassword = async (data: NewPassword) => {
@@ -56,15 +51,15 @@ function ResetPassword() {
     })
   }
 
-  const mutation = useMutation(resetPassword, {
+  const mutation = useMutation({
+    mutationFn: resetPassword,
     onSuccess: () => {
-      showToast("Success!", "Password updated.", "success")
+      showSuccessToast("Password updated successfully.")
       reset()
       navigate({ to: "/login" })
     },
     onError: (err: ApiError) => {
-      const errDetail = err.body?.detail
-      showToast("Something went wrong.", `${errDetail}`, "error")
+      handleError(err)
     },
   })
 
@@ -89,46 +84,23 @@ function ResetPassword() {
       <Text textAlign="center">
         Please enter your new password and confirm it to reset your password.
       </Text>
-      <FormControl mt={4} isInvalid={!!errors.new_password}>
-        <FormLabel htmlFor="password">Set Password</FormLabel>
-        <Input
-          id="password"
-          {...register("new_password", {
-            required: "Password is required",
-            minLength: {
-              value: 8,
-              message: "Password must be at least 8 characters",
-            },
-          })}
-          placeholder="Password"
-          type="password"
-        />
-        {errors.new_password && (
-          <FormErrorMessage>{errors.new_password.message}</FormErrorMessage>
-        )}
-      </FormControl>
-      <FormControl mt={4} isInvalid={!!errors.confirm_password}>
-        <FormLabel htmlFor="confirm_password">Confirm Password</FormLabel>
-        <Input
-          id="confirm_password"
-          {...register("confirm_password", {
-            required: "Please confirm your password",
-            validate: (value) =>
-              value === getValues().new_password ||
-              "The passwords do not match",
-          })}
-          placeholder="Password"
-          type="password"
-        />
-        {errors.confirm_password && (
-          <FormErrorMessage>{errors.confirm_password.message}</FormErrorMessage>
-        )}
-      </FormControl>
-      <Button variant="primary" type="submit">
+      <PasswordInput
+        startElement={<FiLock />}
+        type="new_password"
+        errors={errors}
+        {...register("new_password", passwordRules())}
+        placeholder="New Password"
+      />
+      <PasswordInput
+        startElement={<FiLock />}
+        type="confirm_password"
+        errors={errors}
+        {...register("confirm_password", confirmPasswordRules(getValues))}
+        placeholder="Confirm Password"
+      />
+      <Button variant="solid" type="submit">
         Reset Password
       </Button>
     </Container>
   )
 }
-
-export default ResetPassword

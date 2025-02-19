@@ -1,30 +1,20 @@
-import { ViewIcon, ViewOffIcon } from "@chakra-ui/icons"
-import {
-  Button,
-  Center,
-  Container,
-  FormControl,
-  FormErrorMessage,
-  Icon,
-  Image,
-  Input,
-  InputGroup,
-  InputRightElement,
-  Link,
-  useBoolean,
-} from "@chakra-ui/react"
+import { Container, Image, Input, Text } from "@chakra-ui/react"
 import {
   Link as RouterLink,
   createFileRoute,
   redirect,
 } from "@tanstack/react-router"
-import React from "react"
 import { type SubmitHandler, useForm } from "react-hook-form"
+import { FiLock, FiMail } from "react-icons/fi"
 
-import Logo from "../assets/images/fastapi-logo.svg"
-import type { ApiError } from "../client"
-import type { Body_login_login_access_token as AccessToken } from "../client/models/Body_login_login_access_token"
-import useAuth, { isLoggedIn } from "../hooks/useAuth"
+import type { Body_login_login_access_token as AccessToken } from "@/client"
+import { Button } from "@/components/ui/button"
+import { Field } from "@/components/ui/field"
+import { InputGroup } from "@/components/ui/input-group"
+import { PasswordInput } from "@/components/ui/password-input"
+import useAuth, { isLoggedIn } from "@/hooks/useAuth"
+import Logo from "/assets/images/fastapi-logo.svg"
+import { emailPattern, passwordRules } from "../utils"
 
 export const Route = createFileRoute("/login")({
   component: Login,
@@ -38,9 +28,7 @@ export const Route = createFileRoute("/login")({
 })
 
 function Login() {
-  const [show, setShow] = useBoolean()
-  const { login } = useAuth()
-  const [error, setError] = React.useState<string | null>(null)
+  const { loginMutation, error, resetError } = useAuth()
   const {
     register,
     handleSubmit,
@@ -55,11 +43,14 @@ function Login() {
   })
 
   const onSubmit: SubmitHandler<AccessToken> = async (data) => {
+    if (isSubmitting) return
+
+    resetError()
+
     try {
-      await login(data)
-    } catch (err) {
-      const errDetail = (err as ApiError).body.detail
-      setError(errDetail)
+      await loginMutation.mutateAsync(data)
+    } catch {
+      // error is handled by useAuth hook
     }
   }
 
@@ -83,56 +74,42 @@ function Login() {
           alignSelf="center"
           mb={4}
         />
-        <FormControl id="username" isInvalid={!!errors.username || !!error}>
-          <Input
-            id="username"
-            {...register("username", {
-              pattern: {
-                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i,
-                message: "Invalid email address",
-              },
-            })}
-            placeholder="Email"
-            type="email"
-          />
-          {errors.username && (
-            <FormErrorMessage>{errors.username.message}</FormErrorMessage>
-          )}
-        </FormControl>
-        <FormControl id="password" isInvalid={!!error}>
-          <InputGroup>
+        <Field
+          invalid={!!errors.username}
+          errorText={errors.username?.message || !!error}
+        >
+          <InputGroup w="100%" startElement={<FiMail />}>
             <Input
-              {...register("password")}
-              type={show ? "text" : "password"}
-              placeholder="Password"
+              id="username"
+              {...register("username", {
+                required: "Username is required",
+                pattern: emailPattern,
+              })}
+              placeholder="Email"
+              type="email"
             />
-            <InputRightElement
-              color="gray.400"
-              _hover={{
-                cursor: "pointer",
-              }}
-            >
-              <Icon
-                onClick={setShow.toggle}
-                aria-label={show ? "Hide password" : "Show password"}
-              >
-                {show ? <ViewOffIcon /> : <ViewIcon />}
-              </Icon>
-            </InputRightElement>
           </InputGroup>
-          {error && <FormErrorMessage>{error}</FormErrorMessage>}
-        </FormControl>
-        <Center>
-          <Link as={RouterLink} to="/recover-password" color="blue.500">
-            Forgot password?
-          </Link>
-        </Center>
-        <Button variant="primary" type="submit" isLoading={isSubmitting}>
+        </Field>
+        <PasswordInput
+          type="password"
+          startElement={<FiLock />}
+          {...register("password", passwordRules())}
+          placeholder="Password"
+          errors={errors}
+        />
+        <RouterLink to="/recover-password" className="main-link">
+          Forgot Password?
+        </RouterLink>
+        <Button variant="solid" type="submit" loading={isSubmitting} size="md">
           Log In
         </Button>
+        <Text>
+          Don't have an account?{" "}
+          <RouterLink to="/signup" className="main-link">
+            Sign Up
+          </RouterLink>
+        </Text>
       </Container>
     </>
   )
 }
-
-export default Login

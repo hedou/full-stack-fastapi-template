@@ -3,32 +3,28 @@ import {
   Button,
   Container,
   Flex,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
   Heading,
   Input,
   Text,
-  useColorModeValue,
 } from "@chakra-ui/react"
-import type React from "react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 import { type SubmitHandler, useForm } from "react-hook-form"
-import { useMutation, useQueryClient } from "react-query"
 
 import {
   type ApiError,
-  type UserOut,
+  type UserPublic,
   type UserUpdateMe,
   UsersService,
-} from "../../client"
-import useAuth from "../../hooks/useAuth"
-import useCustomToast from "../../hooks/useCustomToast"
+} from "@/client"
+import useAuth from "@/hooks/useAuth"
+import useCustomToast from "@/hooks/useCustomToast"
+import { emailPattern, handleError } from "@/utils"
+import { Field } from "../ui/field"
 
-const UserInformation: React.FC = () => {
+const UserInformation = () => {
   const queryClient = useQueryClient()
-  const color = useColorModeValue("inherit", "ui.white")
-  const showToast = useCustomToast()
+  const { showSuccessToast } = useCustomToast()
   const [editMode, setEditMode] = useState(false)
   const { user: currentUser } = useAuth()
   const {
@@ -37,7 +33,7 @@ const UserInformation: React.FC = () => {
     reset,
     getValues,
     formState: { isSubmitting, errors, isDirty },
-  } = useForm<UserOut>({
+  } = useForm<UserPublic>({
     mode: "onBlur",
     criteriaMode: "all",
     defaultValues: {
@@ -50,21 +46,17 @@ const UserInformation: React.FC = () => {
     setEditMode(!editMode)
   }
 
-  const updateInfo = async (data: UserUpdateMe) => {
-    await UsersService.updateUserMe({ requestBody: data })
-  }
-
-  const mutation = useMutation(updateInfo, {
+  const mutation = useMutation({
+    mutationFn: (data: UserUpdateMe) =>
+      UsersService.updateUserMe({ requestBody: data }),
     onSuccess: () => {
-      showToast("Success!", "User updated successfully.", "success")
+      showSuccessToast("User updated successfully.")
     },
     onError: (err: ApiError) => {
-      const errDetail = err.body?.detail
-      showToast("Something went wrong.", `${errDetail}`, "error")
+      handleError(err)
     },
     onSettled: () => {
-      queryClient.invalidateQueries("users")
-      queryClient.invalidateQueries("currentUser")
+      queryClient.invalidateQueries()
     },
   })
 
@@ -79,70 +71,74 @@ const UserInformation: React.FC = () => {
 
   return (
     <>
-      <Container maxW="full" as="form" onSubmit={handleSubmit(onSubmit)}>
+      <Container maxW="full">
         <Heading size="sm" py={4}>
           User Information
         </Heading>
-        <Box w={{ sm: "full", md: "50%" }}>
-          <FormControl>
-            <FormLabel color={color} htmlFor="name">
-              Full name
-            </FormLabel>
+        <Box
+          w={{ sm: "full", md: "50%" }}
+          as="form"
+          onSubmit={handleSubmit(onSubmit)}
+        >
+          <Field label="Full name">
             {editMode ? (
               <Input
-                id="name"
                 {...register("full_name", { maxLength: 30 })}
                 type="text"
                 size="md"
+                w="auto"
               />
             ) : (
               <Text
-                size="md"
+                fontSize="md"
                 py={2}
-                color={!currentUser?.full_name ? "gray.400" : "inherit"}
+                color={!currentUser?.full_name ? "gray" : "inherit"}
+                truncate
+                maxWidth="250px"
               >
                 {currentUser?.full_name || "N/A"}
               </Text>
             )}
-          </FormControl>
-          <FormControl mt={4} isInvalid={!!errors.email}>
-            <FormLabel color={color} htmlFor="email">
-              Email
-            </FormLabel>
+          </Field>
+          <Field
+            mt={4}
+            label="Email"
+            invalid={!!errors.email}
+            errorText={errors.email?.message}
+          >
             {editMode ? (
               <Input
-                id="email"
                 {...register("email", {
                   required: "Email is required",
-                  pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i,
-                    message: "Invalid email address",
-                  },
+                  pattern: emailPattern,
                 })}
                 type="email"
                 size="md"
+                w="auto"
               />
             ) : (
-              <Text size="md" py={2}>
+              <Text fontSize="md" py={2} truncate maxWidth="250px">
                 {currentUser?.email}
               </Text>
             )}
-            {errors.email && (
-              <FormErrorMessage>{errors.email.message}</FormErrorMessage>
-            )}
-          </FormControl>
+          </Field>
           <Flex mt={4} gap={3}>
             <Button
-              variant="primary"
+              variant="solid"
               onClick={toggleEditMode}
               type={editMode ? "button" : "submit"}
-              isLoading={editMode ? isSubmitting : false}
-              isDisabled={editMode ? !isDirty || !getValues("email") : false}
+              loading={editMode ? isSubmitting : false}
+              disabled={editMode ? !isDirty || !getValues("email") : false}
             >
               {editMode ? "Save" : "Edit"}
             </Button>
             {editMode && (
-              <Button onClick={onCancel} isDisabled={isSubmitting}>
+              <Button
+                variant="subtle"
+                colorPalette="gray"
+                onClick={onCancel}
+                disabled={isSubmitting}
+              >
                 Cancel
               </Button>
             )}

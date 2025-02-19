@@ -1,98 +1,107 @@
-import {
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  Button,
-} from "@chakra-ui/react"
-import React from "react"
+import { Button, ButtonGroup, Text } from "@chakra-ui/react"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 import { useForm } from "react-hook-form"
-import { useMutation, useQueryClient } from "react-query"
 
-import { type ApiError, type UserOut, UsersService } from "../../client"
-import useAuth from "../../hooks/useAuth"
-import useCustomToast from "../../hooks/useCustomToast"
+import { type ApiError, UsersService } from "@/client"
+import {
+  DialogActionTrigger,
+  DialogBody,
+  DialogCloseTrigger,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import useAuth from "@/hooks/useAuth"
+import useCustomToast from "@/hooks/useCustomToast"
+import { handleError } from "@/utils"
 
-interface DeleteProps {
-  isOpen: boolean
-  onClose: () => void
-}
-
-const DeleteConfirmation: React.FC<DeleteProps> = ({ isOpen, onClose }) => {
+const DeleteConfirmation = () => {
+  const [isOpen, setIsOpen] = useState(false)
   const queryClient = useQueryClient()
-  const showToast = useCustomToast()
-  const cancelRef = React.useRef<HTMLButtonElement | null>(null)
+  const { showSuccessToast } = useCustomToast()
   const {
     handleSubmit,
     formState: { isSubmitting },
   } = useForm()
-  const currentUser = queryClient.getQueryData<UserOut>("currentUser")
   const { logout } = useAuth()
 
-  const deleteCurrentUser = async (id: number) => {
-    await UsersService.deleteUser({ userId: id })
-  }
-
-  const mutation = useMutation(deleteCurrentUser, {
+  const mutation = useMutation({
+    mutationFn: () => UsersService.deleteUserMe(),
     onSuccess: () => {
-      showToast(
-        "Success",
-        "Your account has been successfully deleted.",
-        "success",
-      )
+      showSuccessToast("Your account has been successfully deleted")
+      setIsOpen(false)
       logout()
-      onClose()
     },
     onError: (err: ApiError) => {
-      const errDetail = err.body?.detail
-      showToast("Something went wrong.", `${errDetail}`, "error")
+      handleError(err)
     },
     onSettled: () => {
-      queryClient.invalidateQueries("currentUser")
+      queryClient.invalidateQueries({ queryKey: ["currentUser"] })
     },
   })
 
   const onSubmit = async () => {
-    mutation.mutate(currentUser!.id)
+    mutation.mutate()
   }
 
   return (
     <>
-      <AlertDialog
-        isOpen={isOpen}
-        onClose={onClose}
-        leastDestructiveRef={cancelRef}
-        size={{ base: "sm", md: "md" }}
-        isCentered
+      <DialogRoot
+        size={{ base: "xs", md: "md" }}
+        role="alertdialog"
+        placement="center"
+        open={isOpen}
+        onOpenChange={({ open }) => setIsOpen(open)}
       >
-        <AlertDialogOverlay>
-          <AlertDialogContent as="form" onSubmit={handleSubmit(onSubmit)}>
-            <AlertDialogHeader>Confirmation Required</AlertDialogHeader>
+        <DialogTrigger asChild>
+          <Button variant="solid" colorPalette="red" mt={4}>
+            Delete
+          </Button>
+        </DialogTrigger>
 
-            <AlertDialogBody>
-              All your account data will be{" "}
-              <strong>permanently deleted.</strong> If you are sure, please
-              click <strong>"Confirm"</strong> to proceed. This action cannot be
-              undone.
-            </AlertDialogBody>
+        <DialogContent>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <DialogCloseTrigger />
+            <DialogHeader>
+              <DialogTitle>Confirmation Required</DialogTitle>
+            </DialogHeader>
+            <DialogBody>
+              <Text mb={4}>
+                All your account data will be{" "}
+                <strong>permanently deleted.</strong> If you are sure, please
+                click <strong>"Confirm"</strong> to proceed. This action cannot
+                be undone.
+              </Text>
+            </DialogBody>
 
-            <AlertDialogFooter gap={3}>
-              <Button variant="danger" type="submit" isLoading={isSubmitting}>
-                Confirm
-              </Button>
-              <Button
-                ref={cancelRef}
-                onClick={onClose}
-                isDisabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
+            <DialogFooter gap={2}>
+              <ButtonGroup>
+                <DialogActionTrigger asChild>
+                  <Button
+                    variant="subtle"
+                    colorPalette="gray"
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                </DialogActionTrigger>
+                <Button
+                  variant="solid"
+                  colorPalette="red"
+                  type="submit"
+                  loading={isSubmitting}
+                >
+                  Delete
+                </Button>
+              </ButtonGroup>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </DialogRoot>
     </>
   )
 }
